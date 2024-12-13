@@ -1,4 +1,5 @@
 import Image from "next/image";
+import TimeSinceRelease from "./components/TimeSinceRelease";
 
 export default function Home() {
   return (
@@ -6,7 +7,7 @@ export default function Home() {
       {/* Hero Section */}
       <section
         id="home"
-        className="bg-white dark:bg-gray-900 bg-cover bg-center relative py-64"
+        className="bg-white dark:bg-gray-900 bg-cover bg-center relative py-52"
         style={{backgroundImage: "url('/KSW_52.jpg')"}}
       >
         {/* Optional Overlay */}
@@ -24,8 +25,10 @@ export default function Home() {
         </div>
       </section>
 
+      <TimeSinceRelease />
+
       {/* Services Section */}
-      <section id="services" className="py-20 bg-gray-900">
+      <section id="services" className="py-20 bg-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-center text-gray-800 dark:text-white mb-12">
             Our Services
