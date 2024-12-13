@@ -306,14 +306,6 @@ function SatelliteDetailsCard({
                 <strong>Max Elevation:</strong>{" "}
                 {selectedPass.max_elevation?.toFixed(2)}
               </p>
-              <p className="text-black">
-                <strong>Omnidirectional:</strong>{" "}
-                {selectedPass.los_azimuth !== null &&
-                selectedPass.aos_azimuth !== null &&
-                selectedPass.aos_azimuth + selectedPass.los_azimuth / 2 >= 270
-                  ? "Front guard"
-                  : "Parking"}
-              </p>
             </div>
           </div>
           {/* Close Button */}
