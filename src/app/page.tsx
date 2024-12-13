@@ -20,6 +20,23 @@ interface Pass {
   tle_id: string | null; // Updated to string | null
 }
 
+// 最新のTLEデータを取得する関数
+const fetchLatestTLE = async (satelliteId: string) => {
+  const {data, error} = await supabase
+    .from("tle")
+    .select("*")
+    .eq("satellite_id", satelliteId)
+    .order("created_at", {ascending: false});
+
+  console.log(data);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data[0];
+};
+
 // データフェッチ用の関数
 const fetchTLE = async (tleId: string) => {
   const {data, error} = await supabase.from("tle").select("*").eq("id", tleId);
@@ -39,7 +56,7 @@ const fetcher = async (): Promise<Pass[]> => {
     .from("passes")
     .select("*")
     .gte("aos_time", todayISO)
-    .order("aos_time", {ascending: true}); // 並び替えを追加
+    .order("aos_time", {ascending: true});
 
   if (error) {
     throw new Error(error.message);
@@ -56,6 +73,12 @@ const fetcher = async (): Promise<Pass[]> => {
 export default function Home() {
   const {data, error} = useSWR<Pass[]>("passes", fetcher);
   const [selectedPass, setSelectedPass] = useState<Pass | null>(null);
+
+  // 最新のTLEデータを取得
+  const {data: latestTLE, error: tleError} = useSWR(
+    ["latestTLE", "9034fe42-ba1b-4f96-af49-8951207e5ece"],
+    () => fetchLatestTLE("9034fe42-ba1b-4f96-af49-8951207e5ece")
+  );
 
   if (error) return <div>Error loading data...</div>;
   if (!data) return <div>Loading...</div>;
@@ -87,6 +110,37 @@ export default function Home() {
       </section>
 
       <TimeSinceRelease />
+
+      {/* 最新のTLE情報セクション */}
+      <section id="latest-tle" className="py-8 bg-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
+            Latest TLE:
+          </h2>
+          {tleError && <div className="text-red-500">Error</div>}
+          {!latestTLE && !tleError && <div>読み込み中...</div>}
+          {latestTLE && (
+            <Card className="bg-white dark:bg-zinc-800 p-6 pt-12 rounded-lg shadow">
+              <CardContent>
+                <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                  {latestTLE.content}
+                </pre>
+                <p className="pt-8 text-zinc-400">
+                  update:{" "}
+                  {new Date(latestTLE.created_at).toLocaleString("ja-JP", {
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                  })}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </section>
 
       {/* Services Section */}
       <section id="services" className="py-20 bg-black">
@@ -223,6 +277,22 @@ function SatelliteDetailsCard({
               <p className="text-black">
                 <strong>LOS Time:</strong>{" "}
                 {new Date(selectedPass.los_time).toLocaleString()}
+              </p>
+              <p className="text-black">
+                <strong>Duration:</strong>{" "}
+                {Math.floor(
+                  (new Date(selectedPass.los_time).getTime() -
+                    new Date(selectedPass.aos_time).getTime()) /
+                    60000
+                )}
+                m{" "}
+                {Math.floor(
+                  ((new Date(selectedPass.los_time).getTime() -
+                    new Date(selectedPass.aos_time).getTime()) %
+                    60000) /
+                    1000
+                )}
+                s
               </p>
               <p className="text-black">
                 <strong>AOS Azimuth:</strong>{" "}
