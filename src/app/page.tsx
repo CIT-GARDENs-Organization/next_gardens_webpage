@@ -310,7 +310,7 @@ function SatelliteDetailsCard({
                 <strong>Omnidirectional:</strong>{" "}
                 {selectedPass.los_azimuth !== null &&
                 selectedPass.aos_azimuth !== null &&
-                selectedPass.aos_azimuth - selectedPass.los_azimuth >= 270
+                selectedPass.aos_azimuth + selectedPass.los_azimuth / 2 >= 270
                   ? "Front guard"
                   : "Parking"}
               </p>
