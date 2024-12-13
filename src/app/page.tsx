@@ -46,6 +46,7 @@ const fetcher = async (): Promise<Pass[]> => {
   }
 
   // Transform data to ensure tle_id is string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return data.map((pass: any) => ({
     ...pass,
     tle_id: pass.tle_id ? pass.tle_id.toString() : null,
