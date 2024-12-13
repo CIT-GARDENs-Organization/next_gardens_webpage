@@ -22,7 +22,6 @@ interface Pass {
 
 // データフェッチ用の関数
 const fetchTLE = async (tleId: string) => {
-  // Ensure tleId is string
   const {data, error} = await supabase.from("tle").select("*").eq("id", tleId);
   if (error) {
     throw new Error(error.message);
@@ -32,32 +31,30 @@ const fetchTLE = async (tleId: string) => {
 
 // データフェッチ用の関数 with transformation
 const fetcher = async (): Promise<Pass[]> => {
-  // Specify return type
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
   const todayISO = today.toISOString();
 
   const {data, error} = await supabase
     .from("passes")
     .select("*")
-    .gte("aos_time", todayISO);
+    .gte("aos_time", todayISO)
+    .order("aos_time", {ascending: true}); // 並び替えを追加
 
   if (error) {
     throw new Error(error.message);
   }
 
   // Transform data to ensure tle_id is string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return data.map((pass: any) => ({
     ...pass,
-    tle_id: pass.tle_id ? pass.tle_id.toString() : null, // Convert to string or null
+    tle_id: pass.tle_id ? pass.tle_id.toString() : null,
   }));
 };
 
 export default function Home() {
-  const {data, error} = useSWR<Pass[]>("passes", fetcher); // Specify the type for SWR
-  const [selectedPass, setSelectedPass] = useState<Pass | null>(null); // Type state correctly
+  const {data, error} = useSWR<Pass[]>("passes", fetcher);
+  const [selectedPass, setSelectedPass] = useState<Pass | null>(null);
 
   if (error) return <div>Error loading data...</div>;
   if (!data) return <div>Loading...</div>;
@@ -197,16 +194,16 @@ function SatelliteDetailsCard({
   if (!tleData || tleData.length === 0) return <div>Loading...</div>;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 p-4">
       <Card className="w-full max-w-3xl bg-neutral-100">
         <CardHeader>
           <CardTitle className="text-black">Satellite Pass Details</CardTitle>
         </CardHeader>
         <CardContent>
-          {/* レーダーと情報を左右に分ける */}
-          <div className="flex gap-8">
+          {/* レーダーと情報をレスポンシブに分ける */}
+          <div className="flex flex-col md:flex-row gap-8">
             {/* レーダー（左側） */}
-            <div className="pl-8 pt-4 w-1/2">
+            <div className="pl-2 pt-4 w-full md:w-1/2">
               <Radar
                 maxElevation={selectedPass.max_elevation as number}
                 azimuthStart={selectedPass.aos_azimuth as number}
@@ -214,7 +211,7 @@ function SatelliteDetailsCard({
               />
             </div>
             {/* 情報（右側） */}
-            <div className="w-1/2 flex flex-col gap-2">
+            <div className="w-full md:w-1/2 flex flex-col gap-2">
               <p className="text-black">
                 <strong>Satellite:</strong> YOMOGI
               </p>
@@ -240,7 +237,6 @@ function SatelliteDetailsCard({
               </p>
               <p className="text-black">
                 <strong>Omnidirectional:</strong>{" "}
-                {/* Max Elevationが270~360(0)の時は、守衛前、それ以外の時は駐車場と表示 */}
                 {selectedPass.max_elevation && selectedPass.max_elevation >= 270
                   ? "Front guard"
                   : "Parking"}
