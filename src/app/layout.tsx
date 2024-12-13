@@ -1,5 +1,6 @@
 import type {Metadata} from "next";
 import "./globals.css";
+import "leaflet/dist/leaflet.css";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
 

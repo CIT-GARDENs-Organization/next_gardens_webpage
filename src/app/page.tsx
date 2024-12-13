@@ -1,7 +1,56 @@
-import Image from "next/image";
+"use client";
+import {useState} from "react";
+import useSWR from "swr";
+import {Card, CardHeader, CardTitle, CardContent} from "@/components/ui/card";
 import TimeSinceRelease from "./components/TimeSinceRelease";
+import OrbitMap from "./components/OrbitMap"; // OrbitMapをインポート
+import Radar from "./components/Radar"; // Radarをインポート
+import {createClient} from "@/utils/supabase/client";
+import {calculateOrbitSegments} from "@/lib/calculateOrbitForMap"; // 軌道計算をインポート
+
+const supabase = createClient();
+
+// データフェッチ用の関数
+const fetchTLE = async (tleId) => {
+  const {data, error} = await supabase.from("tle").select("*").eq("id", tleId);
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data;
+};
+
+// データフェッチ用の関数
+const fetcher = async () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const todayISO = today.toISOString();
+
+  // 今日よりも後の日付のデータを取得
+  const {data, error} = await supabase
+    .from("passes")
+    .select("*")
+    .gte("aos_time", todayISO);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+};
 
 export default function Home() {
+  const {data, error} = useSWR("passes", fetcher);
+  const [selectedPass, setSelectedPass] = useState(null);
+
+  if (error) return <div>Error loading data...</div>;
+  if (!data) return <div>Loading...</div>;
+
+  // 特定のsatellite_idでフィルタ
+  const filteredData = data.filter(
+    (pass) => pass.satellite_id === "9034fe42-ba1b-4f96-af49-8951207e5ece"
+  );
+
   return (
     <div className="flex flex-col">
       {/* Hero Section */}
@@ -10,9 +59,7 @@ export default function Home() {
         className="bg-white dark:bg-gray-900 bg-cover bg-center relative py-52"
         style={{backgroundImage: "url('/KSW_52.jpg')"}}
       >
-        {/* Optional Overlay */}
         <div className="absolute inset-0 bg-black opacity-50 dark:opacity-30"></div>
-
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
           <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white sm:text-5xl">
             千葉工業大学 <br />
@@ -28,134 +75,176 @@ export default function Home() {
       <TimeSinceRelease />
 
       {/* Services Section */}
-      <section id="services" className="py-20 bg-gray-800">
+      <section id="services" className="py-20 bg-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-gray-800 dark:text-white mb-12">
-            Our Services
+          <h2 className="text-3xl font-bold text-white mb-6">
+            CIT Satellite Passes:
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-white dark:bg-gray-700 p-6 rounded-lg shadow">
-              <Image
-                src="/service1.svg"
-                alt="Service 1"
-                width={50}
-                height={50}
-                className="mx-auto mb-4"
-              />
-              <h3 className="text-xl font-semibold text-center text-gray-800 dark:text-white">
-                Service One
-              </h3>
-              <p className="mt-2 text-center text-gray-600 dark:text-gray-300">
-                Description of service one. We provide exceptional service to
-                our clients.
-              </p>
-            </div>
-            <div className="bg-white dark:bg-gray-700 p-6 rounded-lg shadow">
-              <Image
-                src="/service2.svg"
-                alt="Service 2"
-                width={50}
-                height={50}
-                className="mx-auto mb-4"
-              />
-              <h3 className="text-xl font-semibold text-center text-gray-800 dark:text-white">
-                Service Two
-              </h3>
-              <p className="mt-2 text-center text-gray-600 dark:text-gray-300">
-                Description of service two. Our expertise ensures quality
-                results.
-              </p>
-            </div>
-            <div className="bg-white dark:bg-gray-700 p-6 rounded-lg shadow">
-              <Image
-                src="/service3.svg"
-                alt="Service 3"
-                width={50}
-                height={50}
-                className="mx-auto mb-4"
-              />
-              <h3 className="text-xl font-semibold text-center text-gray-800 dark:text-white">
-                Service Three
-              </h3>
-              <p className="mt-2 text-center text-gray-600 dark:text-gray-300">
-                Description of service three. We deliver on time and within
-                budget.
-              </p>
-            </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white dark:bg-black">
+              <thead>
+                <tr>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-300">
+                    Satellite
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-300">
+                    AOS Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-300">
+                    LOS Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-300">
+                    Duration
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-300">
+                    AOS Azimuth
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-300">
+                    LOS Azimuth
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-300">
+                    Max Elevation
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredData.map((pass) => {
+                  const durationMs =
+                    new Date(pass.los_time) - new Date(pass.aos_time);
+                  const durationMinutes = Math.floor(durationMs / 60000);
+                  const durationSeconds = Math.floor(
+                    (durationMs % 60000) / 1000
+                  );
+
+                  return (
+                    <tr
+                      key={pass.id}
+                      onClick={() => setSelectedPass(pass)}
+                      className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-500"
+                    >
+                      <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                        YOMOGI
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                        {new Date(pass.aos_time).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                        {new Date(pass.los_time).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                        {durationMinutes}m {durationSeconds}s
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                        {pass.aos_azimuth?.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                        {pass.los_azimuth?.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                        {pass.max_elevation?.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
 
-      {/* About Section */}
-      <section id="about" className="py-20 bg-gray-600">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-gray-800 dark:text-white mb-12">
-            About Us
-          </h2>
-          <div className="flex flex-col md:flex-row items-center">
-            <div className="md:w-1/2">
-              <Image
-                src="/about-us.jpg"
-                alt="About Us"
-                width={600}
-                height={400}
-                className="rounded-lg shadow"
+      {/* Card Section */}
+      {selectedPass && (
+        <SatelliteDetailsCard
+          selectedPass={selectedPass}
+          onClose={() => setSelectedPass(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function SatelliteDetailsCard({selectedPass, onClose}) {
+  const {data: tleData, error} = useSWR(selectedPass.tle_id, fetchTLE);
+
+  if (error) return <div>Error loading TLE data...</div>;
+  if (!tleData || tleData.length === 0) return <div>Loading...</div>;
+
+  const tleString = tleData[0].content;
+  const orbitSegments = calculateOrbitSegments(
+    tleString,
+    new Date(selectedPass.aos_time),
+    new Date(selectedPass.los_time)
+  );
+  const extendedEndTime = new Date(
+    new Date(selectedPass.los_time).getTime() + 90 * 60000
+  );
+  const extendedOrbitSegments = calculateOrbitSegments(
+    tleString,
+    new Date(selectedPass.los_time),
+    extendedEndTime
+  );
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+      <Card className="w-full max-w-3xl bg-neutral-100">
+        <CardHeader>
+          <CardTitle className="text-black">Satellite Pass Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* レーダーと情報を左右に分ける */}
+          <div className="flex gap-8">
+            {/* レーダー（左側） */}
+            <div className="pl-8 pt-4 w-1/2">
+              <Radar
+                satelliteName={selectedPass.name}
+                maxElevation={selectedPass.max_elevation}
+                azimuthStart={selectedPass.aos_azimuth}
+                azimuthEnd={selectedPass.los_azimuth}
               />
             </div>
-            <div className="md:w-1/2 md:pl-12 mt-8 md:mt-0">
-              <p className="text-gray-700 dark:text-gray-300 mb-4">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do
-                eiusmod tempor incididunt ut labore et dolore magna aliqua.
+            {/* 情報（右側） */}
+            <div className="w-1/2 flex flex-col gap-2">
+              <p className="text-black">
+                <strong>Satellite:</strong> YOMOGI
               </p>
-              <p className="text-gray-700 dark:text-gray-300">
-                Ut enim ad minim veniam, quis nostrud exercitation ullamco
-                laboris nisi ut aliquip ex ea commodo consequat.
+              <p className="text-black">
+                <strong>AOS Time:</strong>{" "}
+                {new Date(selectedPass.aos_time).toLocaleString()}
+              </p>
+              <p className="text-black">
+                <strong>LOS Time:</strong>{" "}
+                {new Date(selectedPass.los_time).toLocaleString()}
+              </p>
+              <p className="text-black">
+                <strong>AOS Azimuth:</strong>{" "}
+                {selectedPass.aos_azimuth?.toFixed(2)}
+              </p>
+              <p className="text-black">
+                <strong>LOS Azimuth:</strong>{" "}
+                {selectedPass.los_azimuth?.toFixed(2)}
+              </p>
+              <p className="text-black">
+                <strong>Max Elevation:</strong>{" "}
+                {selectedPass.max_elevation?.toFixed(2)}
+              </p>
+              <p className="text-black">
+                <strong>Omnidirectional:</strong>{" "}
+                {/* Max Elevationが270~360(0)の時は、守衛前、それ以外の時は駐車場と表示 */}
+                {selectedPass.max_elevation >= 270 ? "Front guard" : "Parking"}
               </p>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* Contact Section */}
-      <section id="contact" className="py-20 bg-gray-100 dark:bg-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-8">
-            Get in Touch
-          </h2>
-          <form className="max-w-md mx-auto">
-            <div className="mb-4">
-              <input
-                type="text"
-                placeholder="Your Name"
-                className="w-full px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
-                required
-              />
-            </div>
-            <div className="mb-4">
-              <input
-                type="email"
-                placeholder="Your Email"
-                className="w-full px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
-                required
-              />
-            </div>
-            <div className="mb-4">
-              <textarea
-                placeholder="Your Message"
-                className="w-full px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
-                rows={4}
-                required
-              ></textarea>
-            </div>
+          {/* Close Button */}
+          <div className="mt-4 flex justify-center">
             <button
-              type="submit"
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+              className="px-4 py-2 bg-blue-600 text-white rounded"
+              onClick={onClose}
             >
-              Send Message
+              Close
             </button>
-          </form>
-        </div>
-      </section>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
