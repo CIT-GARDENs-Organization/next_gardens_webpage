@@ -9,7 +9,7 @@ export const calculateOrbitSegments = (
   const tleLines = tleString.split("\n");
   const satrec = satellite.twoline2satrec(tleLines[1], tleLines[2]);
 
-  let segments: LatLngExpression[][] = [];
+  const segments: LatLngExpression[][] = [];
   let currentSegment: [number, number][] = [];
   let currentTime = startTime;
 
@@ -26,7 +26,7 @@ export const calculateOrbitSegments = (
     }
 
     if (positionGd) {
-      let latitude = satellite.degreesLat(positionGd.latitude);
+      const latitude = satellite.degreesLat(positionGd.latitude);
       let longitude = satellite.degreesLong(positionGd.longitude);
 
       if (longitude > 180) {

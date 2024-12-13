@@ -4,25 +4,24 @@ import {Database} from "@/types/supabase";
 import {createServerClient} from "@supabase/ssr";
 import {cookies} from "next/headers";
 
-export function createClient() {
-  const cookieStore = cookies();
+export async function createClient() {
+  const cookieStore = await cookies();
 
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return cookieStore.getAll();
+        async getAll() {
+          return await cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        async setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({name, value, options}) =>
-              cookieStore.set(name, value, options)
-            );
+            for (const {name, value, options} of cookiesToSet) {
+              await cookieStore.set(name, value, options);
+            }
           } catch {
-            // setAll メソッドがサーバーコンポーネントから呼び出されました
-            // ミドルウェアがユーザーセッションを更新している場合、これは無視できます
+            console.error("Failed to set cookies");
           }
         },
       },

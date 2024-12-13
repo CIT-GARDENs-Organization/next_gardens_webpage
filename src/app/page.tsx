@@ -3,15 +3,26 @@ import {useState} from "react";
 import useSWR from "swr";
 import {Card, CardHeader, CardTitle, CardContent} from "@/components/ui/card";
 import TimeSinceRelease from "./components/TimeSinceRelease";
-import OrbitMap from "./components/OrbitMap"; // OrbitMapをインポート
-import Radar from "./components/Radar"; // Radarをインポート
+import Radar from "./components/Radar";
 import {createClient} from "@/utils/supabase/client";
-import {calculateOrbitSegments} from "@/lib/calculateOrbitForMap"; // 軌道計算をインポート
 
 const supabase = createClient();
 
+// Updated Pass interface
+interface Pass {
+  id: string;
+  satellite_id: string;
+  aos_time: string;
+  los_time: string;
+  aos_azimuth: number | null;
+  los_azimuth: number | null;
+  max_elevation: number | null;
+  tle_id: string | null; // Updated to string | null
+}
+
 // データフェッチ用の関数
-const fetchTLE = async (tleId) => {
+const fetchTLE = async (tleId: string) => {
+  // Ensure tleId is string
   const {data, error} = await supabase.from("tle").select("*").eq("id", tleId);
   if (error) {
     throw new Error(error.message);
@@ -19,14 +30,14 @@ const fetchTLE = async (tleId) => {
   return data;
 };
 
-// データフェッチ用の関数
-const fetcher = async () => {
+// データフェッチ用の関数 with transformation
+const fetcher = async (): Promise<Pass[]> => {
+  // Specify return type
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const todayISO = today.toISOString();
 
-  // 今日よりも後の日付のデータを取得
   const {data, error} = await supabase
     .from("passes")
     .select("*")
@@ -36,12 +47,17 @@ const fetcher = async () => {
     throw new Error(error.message);
   }
 
-  return data;
+  // Transform data to ensure tle_id is string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return data.map((pass: any) => ({
+    ...pass,
+    tle_id: pass.tle_id ? pass.tle_id.toString() : null, // Convert to string or null
+  }));
 };
 
 export default function Home() {
-  const {data, error} = useSWR("passes", fetcher);
-  const [selectedPass, setSelectedPass] = useState(null);
+  const {data, error} = useSWR<Pass[]>("passes", fetcher); // Specify the type for SWR
+  const [selectedPass, setSelectedPass] = useState<Pass | null>(null); // Type state correctly
 
   if (error) return <div>Error loading data...</div>;
   if (!data) return <div>Loading...</div>;
@@ -110,7 +126,8 @@ export default function Home() {
               <tbody>
                 {filteredData.map((pass) => {
                   const durationMs =
-                    new Date(pass.los_time) - new Date(pass.aos_time);
+                    new Date(pass.los_time ?? 0).getTime() -
+                    new Date(pass.aos_time ?? 0).getTime();
                   const durationMinutes = Math.floor(durationMs / 60000);
                   const durationSeconds = Math.floor(
                     (durationMs % 60000) / 1000
@@ -126,10 +143,14 @@ export default function Home() {
                         YOMOGI
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
-                        {new Date(pass.aos_time).toLocaleString()}
+                        {pass.aos_time
+                          ? new Date(pass.aos_time).toLocaleString()
+                          : "N/A"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
-                        {new Date(pass.los_time).toLocaleString()}
+                        {pass.los_time
+                          ? new Date(pass.los_time).toLocaleString()
+                          : "N/A"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
                         {durationMinutes}m {durationSeconds}s
@@ -163,26 +184,17 @@ export default function Home() {
   );
 }
 
-function SatelliteDetailsCard({selectedPass, onClose}) {
+function SatelliteDetailsCard({
+  selectedPass,
+  onClose,
+}: {
+  selectedPass: Pass;
+  onClose: () => void;
+}) {
   const {data: tleData, error} = useSWR(selectedPass.tle_id, fetchTLE);
 
   if (error) return <div>Error loading TLE data...</div>;
   if (!tleData || tleData.length === 0) return <div>Loading...</div>;
-
-  const tleString = tleData[0].content;
-  const orbitSegments = calculateOrbitSegments(
-    tleString,
-    new Date(selectedPass.aos_time),
-    new Date(selectedPass.los_time)
-  );
-  const extendedEndTime = new Date(
-    new Date(selectedPass.los_time).getTime() + 90 * 60000
-  );
-  const extendedOrbitSegments = calculateOrbitSegments(
-    tleString,
-    new Date(selectedPass.los_time),
-    extendedEndTime
-  );
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
@@ -196,10 +208,9 @@ function SatelliteDetailsCard({selectedPass, onClose}) {
             {/* レーダー（左側） */}
             <div className="pl-8 pt-4 w-1/2">
               <Radar
-                satelliteName={selectedPass.name}
-                maxElevation={selectedPass.max_elevation}
-                azimuthStart={selectedPass.aos_azimuth}
-                azimuthEnd={selectedPass.los_azimuth}
+                maxElevation={selectedPass.max_elevation as number}
+                azimuthStart={selectedPass.aos_azimuth as number}
+                azimuthEnd={selectedPass.los_azimuth as number}
               />
             </div>
             {/* 情報（右側） */}
@@ -230,7 +241,9 @@ function SatelliteDetailsCard({selectedPass, onClose}) {
               <p className="text-black">
                 <strong>Omnidirectional:</strong>{" "}
                 {/* Max Elevationが270~360(0)の時は、守衛前、それ以外の時は駐車場と表示 */}
-                {selectedPass.max_elevation >= 270 ? "Front guard" : "Parking"}
+                {selectedPass.max_elevation && selectedPass.max_elevation >= 270
+                  ? "Front guard"
+                  : "Parking"}
               </p>
             </div>
           </div>
